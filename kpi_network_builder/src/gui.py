@@ -17,6 +17,7 @@ Key classes:
 """
 import sys
 import pickle
+from typing import Any # Added import
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QTreeView, QGraphicsView, QGraphicsScene,
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QFileDialog,
@@ -601,5 +602,7 @@ if __name__ == '__main__': # pragma: no cover
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
+
+[end of kpi_network_builder/src/gui.py]
 
 [end of kpi_network_builder/src/gui.py]
