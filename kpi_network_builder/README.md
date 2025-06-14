@@ -41,8 +41,9 @@ pip install -r requirements.txt
 ## Running the Application
 To run the KPI Network Builder, execute the following command from the root directory of the project (`kpi_network_builder/`):
 ```bash
-python src/main.py
+python -m src.main
 ```
+Note: Using `python -m src.main` allows Python to correctly recognize `src` as a package, enabling relative imports within the project (like `from .gui import MainWindow`) to work as expected when `main.py` is executed. Running `python src/main.py` directly can lead to `ImportError`s for such relative imports because Python does not add the `src` directory to its path in the same way.
 
 ## Running Tests
 To run the unit tests, execute the following command from the root directory of the project (`kpi_network_builder/`):
