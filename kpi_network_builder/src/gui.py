@@ -250,7 +250,9 @@ class NetworkCanvasView(QGraphicsView):
                 self.items_on_canvas[table_id].setSelected(True); return
 
             table_name = table_id[1]
-            drop_pos = self.mapToScene(event.pos())
+            # QDropEvent.position() returns QPointF. mapToScene expects QPoint.
+            # Explicitly convert QPointF to QPoint using .toPoint()
+            drop_pos = self.mapToScene(event.position().toPoint())
             item_width, item_height = 150, 75
 
             graphics_item = TableGraphicsItem(
@@ -603,6 +605,6 @@ if __name__ == '__main__': # pragma: no cover
     window.show()
     sys.exit(app.exec())
 
-#[end of kpi_network_builder/src/gui.py]
+[end of kpi_network_builder/src/gui.py]
 
-#[end of kpi_network_builder/src/gui.py]
+[end of kpi_network_builder/src/gui.py]
