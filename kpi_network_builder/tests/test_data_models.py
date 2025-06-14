@@ -6,7 +6,7 @@ from dataclasses import asdict
 
 # Adjust import path based on how tests are run.
 # If run from root kpi_network_builder with 'python -m unittest discover tests', this should work.
-from kpi_network_builder.src.data_models import (
+from src.data_models import (
     Schema, KPI, KPIRequiredData, Table, Field, Domain,
     load_schema_from_json, save_kpis_to_json
 )

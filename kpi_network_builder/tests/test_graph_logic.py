@@ -2,8 +2,8 @@ import unittest
 import networkx # For NetworkXNoPath, NodeNotFound
 
 # Adjust import path
-from kpi_network_builder.src.graph_logic import KPINetworkGraph
-from kpi_network_builder.src.data_models import Table, Field, Domain
+from src.graph_logic import KPINetworkGraph
+from src.data_models import Table, Field, Domain
 
 class TestKPINetworkGraph(unittest.TestCase):
     def setUp(self):
