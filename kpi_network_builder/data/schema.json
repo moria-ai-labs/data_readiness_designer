@@ -1,0 +1,27 @@
+[
+  {
+    "domain_name": "Customer",
+    "domain_description": "Information about our customers, including their demographics, contact details, and purchasing history.",
+    "department": "Sales & Marketing",
+    "tables": [
+      {
+        "table_name": "Customers",
+        "table_description": "Core customer information.",
+        "fields": [
+          {
+            "field_name": "customer_id",
+            "field_description": "Unique identifier for the customer (Primary Key)",
+            "data_type": "INT",
+            "constraints": "NOT NULL, PRIMARY KEY"
+          },
+          {
+            "field_name": "customer_name",
+            "field_description": "Name of the customer",
+            "data_type": "VARCHAR",
+            "constraints": "NOT NULL"
+          }
+        ]
+      }
+    ]
+  }
+]
