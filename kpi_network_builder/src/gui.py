@@ -603,6 +603,6 @@ if __name__ == '__main__': # pragma: no cover
     window.show()
     sys.exit(app.exec())
 
-[end of kpi_network_builder/src/gui.py]
+#[end of kpi_network_builder/src/gui.py]
 
-[end of kpi_network_builder/src/gui.py]
+#[end of kpi_network_builder/src/gui.py]
