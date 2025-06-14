@@ -9,7 +9,7 @@ NetworkX directed graph (`DiGraph`). It offers methods to:
 - Suggest potential intermediate tables to bridge gaps between unconnected tables based on shared field names.
 """
 import networkx
-from ..src.data_models import Table, Domain # Adjusted import path
+from .data_models import Table, Domain # Corrected relative import
 
 class KPINetworkGraph:
     """
