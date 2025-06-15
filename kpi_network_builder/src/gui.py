@@ -24,9 +24,9 @@ from PyQt6.QtWidgets import (
     QGraphicsRectItem, QGraphicsTextItem, QAbstractItemView, QGraphicsItem,
     QGraphicsLineItem, QDialog, QLineEdit, QTextEdit, QDialogButtonBox,
     QMessageBox, QListWidget, QListWidgetItem, QLabel, QScrollArea, QFormLayout,
-    QComboBox
+    QComboBox, QPushButton, QToolBar # Added QPushButton, QToolBar
 )
-from PyQt6.QtGui import QStandardItemModel, QStandardItem, QAction, QPainter, QColor, QBrush, QPen
+from PyQt6.QtGui import QStandardItemModel, QStandardItem, QAction, QPainter, QColor, QBrush, QPen, QKeyEvent
 # Ensure QModelIndex is imported directly if used in type hints explicitly after Qt
 from PyQt6.QtCore import Qt, QMimeData, QRectF, QPointF, QLineF, QModelIndex
 
@@ -162,6 +162,9 @@ class ConnectionGraphicsItem(QGraphicsLineItem):
         pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
         self.setPen(pen)
 
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsFocusable, True)
+
         self.setZValue(-1)
         self.update_position()
 
@@ -191,11 +194,15 @@ class TableGraphicsItem(QGraphicsRectItem):
         # Using QGraphicsItem.GraphicsItemFlag
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
-        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, True)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, True) # For connections
 
-        # Using Qt.GlobalColor
+        # Define pens for default and selected states
+        self.default_pen = QPen(Qt.GlobalColor.darkBlue, 1.5)
+        self.selected_pen = QPen(QColor(0, 120, 215), 3) # Selection blue, thicker
+
+        # Using Qt.GlobalColor for brush
         self.setBrush(QBrush(QColor(200, 200, 250, 180)))
-        self.setPen(QPen(Qt.GlobalColor.darkBlue, 1.5))
+        self.setPen(self.default_pen) # Set initial pen
 
         self.text_item = QGraphicsTextItem(self.table_name, self)
         text_rect = self.text_item.boundingRect()
@@ -212,10 +219,21 @@ class TableGraphicsItem(QGraphicsRectItem):
             self.connections.remove(connection_item)
 
     def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value: Any) -> Any:
-        # Using QGraphicsItem.GraphicsItemChange
+        # Update connection line positions if the table item moves
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged and self.scene():
             for conn in self.connections:
                 conn.update_position()
+
+        # Change appearance on selection change
+        if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
+            if value:  # Item is selected (value is True or 1)
+                self.setPen(self.selected_pen)
+                self.setZValue(1) # Bring to front when selected
+            else:  # Item is deselected (value is False or 0)
+                self.setPen(self.default_pen)
+                self.setZValue(0) # Reset z-value
+            self.update() # Request a redraw
+
         return super().itemChange(change, value)
 
 class NetworkCanvasView(QGraphicsView):
@@ -237,6 +255,9 @@ class NetworkCanvasView(QGraphicsView):
 
         # Using QGraphicsView.DragMode
         self.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
+
+        self.connection_mode_active = False # For click-to-connect mode
+        self.source_table_for_click_connection = None # For click-to-connect mode
 
     def set_kpi_graph_ref(self, kpi_graph: KPINetworkGraph):
         self.kpi_graph_ref = kpi_graph
@@ -292,25 +313,100 @@ class NetworkCanvasView(QGraphicsView):
 
     def mousePressEvent(self, event: 'QMouseEvent'): # QMouseEvent from QtGui
         # Using Qt.MouseButton and Qt.KeyboardModifier
-        if event.button() == Qt.MouseButton.LeftButton:
+        if self.connection_mode_active and event.button() == Qt.MouseButton.LeftButton:
             item_at_click = self.itemAt(event.pos())
-            if event.modifiers() == Qt.KeyboardModifier.ShiftModifier or not item_at_click:
-                 super().mousePressEvent(event)
-                 return
-
             if isinstance(item_at_click, TableGraphicsItem):
-                self.drawing_connection = True
-                self.source_table_item_for_connection = item_at_click
+                if self.source_table_for_click_connection is None:
+                    self.source_table_for_click_connection = item_at_click
+                    # TODO: Add visual cue for selected source table (e.g., different border)
+                    print(f"CLICK-CONNECT: Source set to {item_at_click.table_id}")
+                    event.accept()
+                    return
+                elif self.source_table_for_click_connection == item_at_click:
+                    # Clicked on the source item again, so deselect it as source
+                    print(f"CLICK-CONNECT: Source {item_at_click.table_id} deselected.")
+                    # TODO: Remove visual cue from self.source_table_for_click_connection
+                    self.source_table_for_click_connection = None
+                    event.accept()
+                    return
+                else: # A source is selected, and we clicked a different TableGraphicsItem (target)
+                    target_item = item_at_click
+                    source_item = self.source_table_for_click_connection
 
-                line_start_pos = item_at_click.scenePos() + item_at_click.boundingRect().center()
+                    source_table_id = source_item.table_id
+                    target_table_id = target_item.table_id
+
+                    # Prevent duplicate visual connections
+                    for conn in source_item.connections: # Check source's connections
+                        if conn.target() == target_item:
+                            print(f"CLICK-CONNECT: Connection {source_table_id}->{target_table_id} already exists.")
+                            self.source_table_for_click_connection = None # Reset source
+                            event.accept()
+                            return
+                    # Optionally, check target's connections too if you want to be absolutely sure for undirected visual representation
+                    # This might be redundant if connections are always added to both items' lists.
+                    for conn in target_item.connections:
+                         if conn.source() == source_item: # Check if target is already source of a connection to our source_item
+                            print(f"CLICK-CONNECT: Connection {target_table_id}->{source_table_id} already exists.")
+                            self.source_table_for_click_connection = None # Reset source
+                            event.accept()
+                            return
+
+
+                    link_is_valid = False # Default
+                    if self.kpi_graph_ref and \
+                       self.kpi_graph_ref.graph.has_node(source_table_id) and \
+                       self.kpi_graph_ref.graph.has_node(target_table_id):
+                        source_table_obj = self.kpi_graph_ref.graph.nodes[source_table_id].get('table_obj')
+                        target_table_obj = self.kpi_graph_ref.graph.nodes[target_table_id].get('table_obj')
+                        if source_table_obj and target_table_obj:
+                            link_is_valid = has_common_fields(source_table_obj, target_table_obj)
+                        else: print("CLICK-CONNECT: Error: Table object(s) not found in graph node data.")
+                    else: print("CLICK-CONNECT: Error: Source or target table node not found in graph.")
+
+                    self.kpi_graph_ref.add_connection(source_table_id, target_table_id, is_valid=link_is_valid)
+                    new_connection = ConnectionGraphicsItem(source_item, target_item, is_valid_link=link_is_valid)
+                    self.scene().addItem(new_connection)
+                    source_item.add_connection(new_connection)
+                    target_item.add_connection(new_connection)
+                    print(f"CLICK-CONNECT: Connected {source_table_id} to {target_table_id}, valid: {link_is_valid}")
+
+                    self.source_table_for_click_connection = None # Reset after connection
+                    # TODO: Remove visual cue from source_item
+                    event.accept()
+                    return
+            else: # Clicked on empty space in connection mode
+                if self.source_table_for_click_connection:
+                    print(f"CLICK-CONNECT: Source {self.source_table_for_click_connection.table_id} deselected by clicking elsewhere.")
+                    # TODO: Remove visual cue from self.source_table_for_click_connection
+                self.source_table_for_click_connection = None
+                # Let event pass through for scene deselection or other background actions,
+                # unless specific behavior (like consuming the click) is desired here.
+                # For now, we don't accept the event, allowing default scene deselection etc.
+                # super().mousePressEvent(event) # Or this, if we want default QGraphicsView processing for empty space clicks
+                return # Explicitly return if we handled the deselection.
+
+        # Original logic for drag-connection (if not in connection_mode_active) and other interactions
+        item_under_mouse = self.itemAt(event.pos())
+
+        if not self.connection_mode_active and event.button() == Qt.MouseButton.LeftButton:
+            if isinstance(item_under_mouse, TableGraphicsItem):
+                # Start drawing a drag-connection (original behavior)
+                self.drawing_connection = True # This is the drag-connection flag
+                self.source_table_item_for_connection = item_under_mouse # This is for drag-connection
+
+                line_start_pos = item_under_mouse.scenePos() + item_under_mouse.boundingRect().center()
                 current_mouse_pos = self.mapToScene(event.pos())
                 self.temp_line_item = QGraphicsLineItem(QLineF(line_start_pos, current_mouse_pos))
-                # Using Qt.GlobalColor and Qt.PenStyle
                 self.temp_line_item.setPen(QPen(Qt.GlobalColor.red, 2, Qt.PenStyle.DashLine))
                 self.scene().addItem(self.temp_line_item)
                 event.accept()
                 return
+
+        # Fallback to default QGraphicsView behavior for selection, panning if set, etc.
+        # This will handle selection of TableGraphicsItems and ConnectionGraphicsItems (if selectable).
         super().mousePressEvent(event)
+
 
     def mouseMoveEvent(self, event: 'QMouseEvent'):
         if self.drawing_connection and self.temp_line_item and self.source_table_item_for_connection:
@@ -383,6 +479,58 @@ class NetworkCanvasView(QGraphicsView):
 
         self.source_table_item_for_connection = None
         super().mouseReleaseEvent(event)
+
+    def set_connection_mode(self, enabled: bool):
+        """Activates or deactivates the click-to-connect mode."""
+        self.connection_mode_active = enabled
+        if not enabled:
+            # Reset any partial connection state if mode is turned off
+            self.source_table_for_click_connection = None
+            # Optionally, change cursor back to default if it was changed
+            print("Canvas click-connection mode OFF, click-connection source reset.")
+        else:
+            # Optionally, change cursor to a crosshair or something indicative
+            print("Canvas click-connection mode ON.")
+        # This method might also be used to change view behavior, e.g., intercepting clicks differently
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        if event.key() == Qt.Key.Key_Delete:
+            selected_connections = []
+            for item in self.scene().selectedItems():
+                if isinstance(item, ConnectionGraphicsItem):
+                    selected_connections.append(item)
+
+            if selected_connections:
+                for conn_item in selected_connections: # Iterate over a copy if modifying the list during iteration
+                    source_table_gitem = conn_item.source()
+                    target_table_gitem = conn_item.target()
+                    source_id = source_table_gitem.table_id
+                    target_id = target_table_gitem.table_id
+
+                    # Remove from Graph
+                    if self.kpi_graph_ref and self.kpi_graph_ref.graph.has_edge(source_id, target_id):
+                        self.kpi_graph_ref.graph.remove_edge(source_id, target_id)
+                        print(f"Removed edge {source_id}-{target_id} from KPINetworkGraph")
+
+                    # Remove from Scene
+                    self.scene().removeItem(conn_item)
+                    print(f"Removed {conn_item} from scene")
+
+                    # Update Connected TableGraphicsItems
+                    # Ensure these methods exist and work correctly
+                    if hasattr(source_table_gitem, 'remove_connection') and callable(getattr(source_table_gitem, 'remove_connection')):
+                        source_table_gitem.remove_connection(conn_item)
+                    if hasattr(target_table_gitem, 'remove_connection') and callable(getattr(target_table_gitem, 'remove_connection')):
+                        target_table_gitem.remove_connection(conn_item)
+
+                event.accept()
+            else:
+                # If no connections are selected, maybe delete selected tables?
+                # For now, just pass to super if no connections specifically selected for deletion.
+                super().keyPressEvent(event)
+        else:
+            super().keyPressEvent(event)
+
 
 class FieldSelectionWidget(QWidget):
     """
@@ -571,9 +719,10 @@ class MainWindow(QMainWindow):
         central_widget.setLayout(self.main_layout)
         self.setCentralWidget(central_widget)
 
-        self._create_menus()
+        self._create_menus_and_toolbar()
 
-    def _create_menus(self):
+    def _create_menus_and_toolbar(self):
+        # File Menu (existing)
         file_menu = self.menuBar().addMenu("&File")
         open_schema_action = QAction("&Open Schema...", self)
         open_schema_action.triggered.connect(self.load_schema_action)
@@ -593,6 +742,26 @@ class MainWindow(QMainWindow):
         define_kpi_action.setToolTip("Define a new KPI based on currently selected tables on the canvas.")
         define_kpi_action.triggered.connect(self.define_kpi_action_triggered)
         kpi_menu.addAction(define_kpi_action)
+
+        # Toolbar for connection mode toggle
+        toolbar = self.addToolBar("Tools")
+        self.connection_mode_button = QPushButton("Start Connection Mode")
+        self.connection_mode_button.setCheckable(True)
+        self.connection_mode_button.toggled.connect(self.toggle_connection_mode)
+        toolbar.addWidget(self.connection_mode_button)
+
+
+    def toggle_connection_mode(self, checked: bool):
+        if checked:
+            self.connection_mode_button.setText("End Connection Mode")
+            # Pass this state to NetworkCanvasView
+            self.network_canvas_view.set_connection_mode(True)
+            print("MainW: Connection Mode ON")
+        else:
+            self.connection_mode_button.setText("Start Connection Mode")
+            # Pass this state to NetworkCanvasView
+            self.network_canvas_view.set_connection_mode(False)
+            print("MainW: Connection Mode OFF")
 
     def load_schema_action(self):
         # Using QFileDialog.getOpenFileName
