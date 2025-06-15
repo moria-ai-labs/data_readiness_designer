@@ -56,9 +56,25 @@ class TestKPINetworkGraph(unittest.TestCase):
         self.assertEqual(self.graph.graph.nodes[self.t4_id]['table_obj'], self.T4_obj)
 
     def test_add_connection(self):
-        self.graph.add_connection(self.t1_id, self.t2_id, type="FK_Join")
+        self.graph.add_connection(self.t1_id, self.t2_id, type="FK_Join", is_valid=True)
         self.assertTrue(self.graph.graph.has_edge(self.t1_id, self.t2_id))
-        self.assertEqual(self.graph.graph.edges[self.t1_id, self.t2_id]['type'], "FK_Join")
+        edge_data = self.graph.graph.get_edge_data(self.t1_id, self.t2_id)
+        self.assertEqual(edge_data['type'], "FK_Join")
+        self.assertTrue(edge_data['is_valid'])
+
+        # Test adding a connection with is_valid=False
+        self.graph.add_connection(self.t2_id, self.t3_id, is_valid=False, reason="No common fields")
+        self.assertTrue(self.graph.graph.has_edge(self.t2_id, self.t3_id))
+        edge_data_invalid = self.graph.graph.get_edge_data(self.t2_id, self.t3_id)
+        self.assertFalse(edge_data_invalid['is_valid'])
+        self.assertEqual(edge_data_invalid['reason'], "No common fields")
+
+        # Test default value of is_valid
+        self.graph.add_connection(self.t3_id, self.t4_id, custom_attr="test") # is_valid should default to True
+        self.assertTrue(self.graph.graph.has_edge(self.t3_id, self.t4_id))
+        edge_data_default = self.graph.graph.get_edge_data(self.t3_id, self.t4_id)
+        self.assertTrue(edge_data_default['is_valid'])
+        self.assertEqual(edge_data_default['custom_attr'], "test")
 
         # Test adding edge with non-existent node (NetworkX behavior: adds node)
         # KPINetworkGraph.add_connection doesn't prevent this, relies on NetworkX

@@ -36,6 +36,17 @@ from .graph_logic import KPINetworkGraph
 
 KPI_TABLE_MIME_TYPE = "application/x-kpi-table" # Custom MIME type for drag-drop operations
 
+# Helper function
+def has_common_fields(table1_obj: Table, table2_obj: Table) -> bool:
+    '''Checks if two Table objects share any common field names.'''
+    if not table1_obj or not table2_obj:
+        return False
+
+    table1_field_names = {field.field_name for field in table1_obj.fields}
+    table2_field_names = {field.field_name for field in table2_obj.fields}
+
+    return not table1_field_names.isdisjoint(table2_field_names)
+
 class DraggableStandardItemModel(QStandardItemModel):
     """
     Custom QStandardItemModel to enable dragging of table items.
@@ -131,12 +142,26 @@ class ConnectionGraphicsItem(QGraphicsLineItem):
     """
     A QGraphicsLineItem subclass representing a visual connection between two TableGraphicsItems.
     """
-    def __init__(self, source_item: 'TableGraphicsItem', target_item: 'TableGraphicsItem', parent: QGraphicsItem | None = None):
+    def __init__(self, source_item: 'TableGraphicsItem', target_item: 'TableGraphicsItem',
+                 is_valid_link: bool, parent: QGraphicsItem | None = None):
         super().__init__(parent)
         self.source_item = source_item
         self.target_item = target_item
-        # Using Qt.GlobalColor, Qt.PenStyle, Qt.PenCapStyle, Qt.PenJoinStyle
-        self.setPen(QPen(Qt.GlobalColor.white, 2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
+        self.is_valid_link = is_valid_link
+
+        pen = QPen()
+        pen.setWidth(2)
+        if self.is_valid_link:
+            pen.setColor(Qt.GlobalColor.white)
+            pen.setStyle(Qt.PenStyle.SolidLine)
+        else:
+            pen.setColor(QColor(255, 165, 0)) # Orange color for invalid/suggested links
+            pen.setStyle(Qt.PenStyle.DashLine)
+
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        self.setPen(pen)
+
         self.setZValue(-1)
         self.update_position()
 
@@ -314,6 +339,7 @@ class NetworkCanvasView(QGraphicsView):
                 source_node = self.source_table_item_for_connection
                 target_node = target_item
 
+                # Check for existing visual connection
                 for conn in source_node.connections:
                     if conn.target() == target_node:
                         print(f"Visual connection from {source_node.table_id} to {target_node.table_id} already exists.")
@@ -321,14 +347,33 @@ class NetworkCanvasView(QGraphicsView):
                         event.accept()
                         return
 
-                new_connection = ConnectionGraphicsItem(source_node, target_node)
+                source_table_id = source_node.table_id
+                target_table_id = target_node.table_id
+                link_is_valid = False # Default to False
+
+                if self.kpi_graph_ref and \
+                   source_table_id in self.kpi_graph_ref.graph.nodes and \
+                   target_table_id in self.kpi_graph_ref.graph.nodes:
+
+                    source_table_obj = self.kpi_graph_ref.graph.nodes[source_table_id].get('table_obj')
+                    target_table_obj = self.kpi_graph_ref.graph.nodes[target_table_id].get('table_obj')
+
+                    if source_table_obj and target_table_obj:
+                        link_is_valid = has_common_fields(source_table_obj, target_table_obj)
+                    else:
+                        print(f"Warning: Could not retrieve table objects for {source_table_id} or {target_table_id}.")
+                else:
+                    print(f"Warning: kpi_graph_ref not set or nodes not found for connection {source_table_id} -> {target_table_id}.")
+
+
+                new_connection = ConnectionGraphicsItem(source_node, target_node, is_valid_link=link_is_valid)
                 self.scene().addItem(new_connection)
                 source_node.add_connection(new_connection)
                 target_node.add_connection(new_connection)
 
                 if self.kpi_graph_ref:
-                    self.kpi_graph_ref.add_connection(source_node.table_id, target_node.table_id)
-                    print(f"Connection added to KPINetworkGraph: {source_node.table_id} -> {target_node.table_id}")
+                    self.kpi_graph_ref.add_connection(source_table_id, target_table_id, is_valid=link_is_valid)
+                    print(f"Connection added to KPINetworkGraph: {source_table_id} -> {target_table_id}, is_valid={link_is_valid}")
                 event.accept()
             else:
                 print("Connection attempt failed: No valid target or target is the source.")
@@ -484,11 +529,47 @@ class MainWindow(QMainWindow):
         self.defined_kpis: list[KPI] = []
 
         # Using Qt.Orientation
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.addWidget(self.schema_view)
-        splitter.addWidget(self.network_canvas_view)
-        splitter.setSizes([300, 900])
-        self.setCentralWidget(splitter)
+        self.splitter = QSplitter(Qt.Orientation.Horizontal) # Store splitter as instance member
+        self.splitter.addWidget(self.schema_view)
+        self.splitter.addWidget(self.network_canvas_view)
+        self.splitter.setSizes([300, 900])
+
+        # Create main layout for the central widget
+        self.main_layout = QVBoxLayout()
+        self.main_layout.addWidget(self.splitter) # Add splitter to the layout
+
+        # Create Legend
+        legend_group_box = QGroupBox("Legend")
+        legend_layout = QVBoxLayout() # Use QVBoxLayout for stacking legend items vertically
+
+        # Valid Link item
+        valid_link_layout = QHBoxLayout()
+        valid_line_label = QLabel()
+        valid_line_label.setFixedSize(20, 4)
+        valid_line_label.setStyleSheet("background-color: white; border: 1px solid #777;")
+        valid_link_layout.addWidget(valid_line_label)
+        valid_link_layout.addWidget(QLabel("Valid Link (Common Field)"))
+        legend_layout.addLayout(valid_link_layout)
+
+        # Potential Link item
+        potential_link_layout = QHBoxLayout()
+        potential_line_label = QLabel()
+        potential_line_label.setFixedSize(20, 4)
+        # Simple orange box, with text specifying "Dashed"
+        potential_line_label.setStyleSheet("background-color: orange;")
+        potential_link_layout.addWidget(potential_line_label)
+        potential_link_layout.addWidget(QLabel("Potential Link (No Common Field, Dashed Orange Line)"))
+        legend_layout.addLayout(potential_link_layout)
+
+        legend_group_box.setLayout(legend_layout)
+        legend_group_box.setFixedHeight(legend_group_box.sizeHint().height()) # Adjust size to content
+
+        self.main_layout.addWidget(legend_group_box) # Add legend below splitter
+
+        # Set the central widget
+        central_widget = QWidget()
+        central_widget.setLayout(self.main_layout)
+        self.setCentralWidget(central_widget)
 
         self._create_menus()
 
@@ -604,6 +685,8 @@ if __name__ == '__main__': # pragma: no cover
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
+
+[end of kpi_network_builder/src/gui.py]
 
 [end of kpi_network_builder/src/gui.py]
 

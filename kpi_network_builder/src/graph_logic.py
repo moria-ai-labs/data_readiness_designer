@@ -41,19 +41,22 @@ class KPINetworkGraph:
         node_id = (domain_name, table_name)
         self.graph.add_node(node_id, table_obj=table_data)
 
-    def add_connection(self, source_table_id: tuple[str, str], target_table_id: tuple[str, str], **attrs):
+    def add_connection(self, source_table_id: tuple[str, str], target_table_id: tuple[str, str],
+                       is_valid: bool = True, **attrs):
         """
         Adds a directed connection (edge) between two table nodes in the graph.
 
-        Additional attributes for the connection (e.g., type of join, specific fields involved)
-        can be passed as keyword arguments.
+        An `is_valid` attribute is stored on the edge, defaulting to True.
+        Other attributes for the connection can be passed via `**attrs`.
 
         Args:
             source_table_id (tuple[str, str]): The ID `(domain_name, table_name)` of the source table.
             target_table_id (tuple[str, str]): The ID `(domain_name, table_name)` of the target table.
-            **attrs: Arbitrary keyword arguments to store as attributes of the edge.
+            is_valid (bool): Indicates if the connection is considered valid (e.g., based on field compatibility).
+                             Defaults to True.
+            **attrs: Arbitrary additional keyword arguments to store as attributes of the edge.
         """
-        self.graph.add_edge(source_table_id, target_table_id, **attrs)
+        self.graph.add_edge(source_table_id, target_table_id, is_valid=is_valid, **attrs)
 
     def path_exists(self, source_table_id: tuple[str, str], target_table_id: tuple[str, str]) -> bool:
         """
