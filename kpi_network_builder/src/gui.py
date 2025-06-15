@@ -136,7 +136,7 @@ class ConnectionGraphicsItem(QGraphicsLineItem):
         self.source_item = source_item
         self.target_item = target_item
         # Using Qt.GlobalColor, Qt.PenStyle, Qt.PenCapStyle, Qt.PenJoinStyle
-        self.setPen(QPen(Qt.GlobalColor.black, 2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
+        self.setPen(QPen(Qt.GlobalColor.white, 2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
         self.setZValue(-1)
         self.update_position()
 
