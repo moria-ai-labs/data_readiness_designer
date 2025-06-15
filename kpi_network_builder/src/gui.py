@@ -20,7 +20,7 @@ import pickle
 from typing import Any # Added import
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QTreeView, QGraphicsView, QGraphicsScene,
-    QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QFileDialog,
+    QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QFileDialog, QGroupBox,
     QGraphicsRectItem, QGraphicsTextItem, QAbstractItemView, QGraphicsItem,
     QGraphicsLineItem, QDialog, QLineEdit, QTextEdit, QDialogButtonBox,
     QMessageBox, QListWidget, QListWidgetItem, QLabel, QScrollArea, QFormLayout,
