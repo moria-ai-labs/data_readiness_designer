@@ -1,0 +1,188 @@
+[
+    {
+        "domain_name": "Customer",
+        "domain_description": "Information about Bamfurlong's customers, including their demographics, contact information, and purchasing history.",
+        "department": "Marketing & Sales",
+        "tables": [
+            {
+                "table_name": "Customer",
+                "table_description": "Core customer information.",
+                "fields": [
+                    {
+                        "field_name": "CustomerID",
+                        "field_description": "Unique identifier for the customer.",
+                        "data_type": "INT",
+                        "primary_key": true,
+                        "nullable": false
+                    },
+                    {
+                        "field_name": "FirstName",
+                        "field_description": "Customer's first name.",
+                        "data_type": "VARCHAR(255)",
+                        "nullable": true
+                    },
+                    {
+                        "field_name": "LastName",
+                        "field_description": "Customer's last name.",
+                        "data_type": "VARCHAR(255)",
+                        "nullable": true
+                    },
+                    {
+                        "field_name": "Email",
+                        "field_description": "Customer's email address.",
+                        "data_type": "VARCHAR(255)",
+                        "nullable": true
+                    },
+                    {
+                        "field_name": "PhoneNumber",
+                        "field_description": "Customer's phone number.",
+                        "data_type": "VARCHAR(20)",
+                        "nullable": true
+                    },
+                    {
+                        "field_name": "AddressID",
+                        "field_description": "Foreign key referencing the Address table.",
+                        "data_type": "INT",
+                        "nullable": true,
+                        "foreign_key": true,
+                        "foreign_key_table": "Address",
+                        "foreign_key_column": "AddressID"
+                    },
+                    {
+                        "field_name": "CustomerSince",
+                        "field_description": "Date when the customer first became a customer.",
+                        "data_type": "DATE",
+                        "nullable": true
+                    },
+                    {
+                        "field_name": "FarmSizeAcres",
+                        "field_description": "Size of the customer's farm in acres.",
+                        "data_type": "DECIMAL(10,2)",
+                        "nullable": true
+                    },
+                    {
+                        "field_name": "CustomerType",
+                        "field_description": "Type of Customer (e.g., 'Large Farm', 'Hobby Farmer', 'Contractor')",
+                        "data_type": "VARCHAR(50)",
+                        "nullable": true
+                    }
+                ]
+            },
+            {
+                "table_name": "Address",
+                "table_description": "Customer address information.",
+                "fields": [
+                    {
+                        "field_name": "AddressID",
+                        "field_description": "Unique identifier for the address.",
+                        "data_type": "INT",
+                        "primary_key": true,
+                        "nullable": false
+                    },
+                    {
+                        "field_name": "StreetAddress",
+                        "field_description": "Street address.",
+                        "data_type": "VARCHAR(255)",
+                        "nullable": false
+                    },
+                    {
+                        "field_name": "City",
+                        "field_description": "City.",
+                        "data_type": "VARCHAR(255)",
+                        "nullable": false
+                    },
+                    {
+                        "field_name": "State",
+                        "field_description": "State.",
+                        "data_type": "VARCHAR(2)",
+                        "nullable": false
+                    },
+                    {
+                        "field_name": "ZipCode",
+                        "field_description": "Zip code.",
+                        "data_type": "VARCHAR(10)",
+                        "nullable": false
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "domain_name": "Product",
+        "domain_description": "Information about the products Bamfurlong sells, including their descriptions, categories, and pricing.",
+        "department": "Product Management",
+        "tables": [
+            {
+                "table_name": "Product",
+                "table_description": "Core product information.",
+                "fields": [
+                    {
+                        "field_name": "ProductID",
+                        "field_description": "Unique identifier for the product.",
+                        "data_type": "INT",
+                        "primary_key": true,
+                        "nullable": false
+                    },
+                    {
+                        "field_name": "ProductName",
+                        "field_description": "Name of the product.",
+                        "data_type": "VARCHAR(255)",
+                        "nullable": false
+                    },
+                    {
+                        "field_name": "ProductDescription",
+                        "field_description": "Detailed description of the product.",
+                        "data_type": "TEXT",
+                        "nullable": true
+                    },
+                    {
+                        "field_name": "CategoryID",
+                        "field_description": "Foreign key referencing the Category table.",
+                        "data_type": "INT",
+                        "nullable": false,
+                        "foreign_key": true,
+                        "foreign_key_table": "Category",
+                        "foreign_key_column": "CategoryID"
+                    },
+                    {
+                        "field_name": "UnitPrice",
+                        "field_description": "Price of the product.",
+                        "data_type": "DECIMAL(10,2)",
+                        "nullable": false
+                    },
+                    {
+                        "field_name": "Manufacturer",
+                        "field_description": "Product Manufacturer",
+                        "data_type": "VARCHAR(255)",
+                        "nullable": true
+                    }
+                ]
+            },
+            {
+                "table_name": "Category",
+                "table_description": "Product categories.",
+                "fields": [
+                    {
+                        "field_name": "CategoryID",
+                        "field_description": "Unique identifier for the category.",
+                        "data_type": "INT",
+                        "primary_key": true,
+                        "nullable": false
+                    },
+                    {
+                        "field_name": "CategoryName",
+                        "field_description": "Name of the category.",
+                        "data_type": "VARCHAR(255)",
+                        "nullable": false
+                    },
+                    {
+                        "field_name": "CategoryDescription",
+                        "field_description": "Description of the category.",
+                        "data_type": "TEXT",
+                        "nullable": true
+                    }
+                ]
+            }
+        ]
+    }
+]
