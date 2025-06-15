@@ -191,7 +191,8 @@ class TestKPISaving(unittest.TestCase):
                 data_required=[
                     KPIRequiredData(domain_name="Sales", table_name="Orders", field_name="amount"),
                     KPIRequiredData(domain_name="Sales", table_name="Orders", field_name="order_id")
-                ]
+                ],
+                isAvailable=True # Explicitly set for testing
             ),
             KPI(
                 kpi_name="New Customers",
@@ -202,7 +203,17 @@ class TestKPISaving(unittest.TestCase):
                 data_required=[
                     KPIRequiredData(domain_name="CRM", table_name="Customers", field_name="customer_id"),
                     KPIRequiredData(domain_name="CRM", table_name="Customers", field_name="signup_date")
-                ]
+                ],
+                isAvailable=False # Explicitly set for testing
+            ),
+            KPI( # Test default isAvailable
+                kpi_name="Default Availability KPI",
+                department="Operations",
+                report_name="Ops Report",
+                cadence="Monthly",
+                description="KPI with default isAvailable.",
+                data_required=[] # No specific data needed for this test focus
+                # isAvailable will use default False
             )
         ]
 
@@ -226,10 +237,19 @@ class TestKPISaving(unittest.TestCase):
                 expected_kpi_dict = expected_data[i]
                 self.assertEqual(saved_kpi_dict['kpi_name'], expected_kpi_dict['kpi_name'])
                 self.assertEqual(saved_kpi_dict['department'], expected_kpi_dict['department'])
-                # ... (rest of the assertions for KPI fields remain the same)
                 self.assertEqual(saved_kpi_dict['report_name'], expected_kpi_dict['report_name'])
                 self.assertEqual(saved_kpi_dict['cadence'], expected_kpi_dict['cadence'])
                 self.assertEqual(saved_kpi_dict['description'], expected_kpi_dict['description'])
+
+                # Assert the isAvailable field
+                # Use .get() for saved_kpi_dict in case 'isAvailable' might be missing (though asdict should include it if default is set)
+                # For expected_kpi_dict, direct access is fine as asdict will include fields with default values.
+                self.assertEqual(saved_kpi_dict.get('isAvailable'), expected_kpi_dict['isAvailable'])
+                # Specifically check the default for the third KPI
+                if expected_kpi_dict['kpi_name'] == "Default Availability KPI":
+                    self.assertFalse(saved_kpi_dict.get('isAvailable')) # Default is False
+                    self.assertFalse(expected_kpi_dict['isAvailable'])
+
 
                 self.assertIsInstance(saved_kpi_dict['data_required'], list)
                 self.assertEqual(len(saved_kpi_dict['data_required']), len(expected_kpi_dict['data_required']))

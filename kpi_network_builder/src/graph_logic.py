@@ -208,3 +208,63 @@ class KPINetworkGraph:
                         # Store suggestions, ensuring no duplicate bridge tables for a given pair.
                         suggestions[((t1_id, t2_id))] = list(set(potential_bridges))
         return suggestions
+
+    def check_kpi_connectivity(self, table_ids: list[tuple[str, str]]) -> bool:
+        '''
+        Checks if all specified table_ids form a single weakly connected component
+        using only edges marked with 'is_valid': True.
+        A KPI with 0 or 1 table is considered trivially connected.
+        '''
+        if not table_ids or len(table_ids) <= 1:
+            return True
+
+        # Ensure all requested table_ids are actually nodes in the main graph
+        # Using a set for efficient lookup and to handle duplicates in input table_ids
+        unique_table_ids_in_input = set(table_ids)
+        valid_nodes_in_graph = [tid for tid in unique_table_ids_in_input if self.graph.has_node(tid)]
+
+        if len(valid_nodes_in_graph) != len(unique_table_ids_in_input):
+            # Some tables specified for the KPI are not actually in the graph (e.g., not on canvas).
+            # This KPI definition is problematic regarding connectivity.
+            print(f"Warning: Some tables for KPI connectivity check are not in the graph: {unique_table_ids_in_input - set(valid_nodes_in_graph)}")
+            return False
+
+        # If, after filtering for nodes present in the graph, we have 0 or 1, it's trivially connected.
+        if len(valid_nodes_in_graph) <= 1:
+            return True
+
+        # Create a new graph containing only the valid nodes and edges marked 'is_valid': True
+        # from the original graph that are relevant to these valid_nodes_in_graph.
+        valid_kpi_graph = self.graph.__class__() # Creates a new graph of the same type (e.g., DiGraph)
+
+        # Add only the nodes that are part of this KPI and exist in the main graph
+        valid_kpi_graph.add_nodes_from(valid_nodes_in_graph)
+        # Copy node attributes for the added nodes from the main graph
+        for node_id in valid_nodes_in_graph:
+            valid_kpi_graph.nodes[node_id].update(self.graph.nodes[node_id])
+
+
+        # Add edges from the main graph only if they connect two nodes within our valid_nodes_in_graph set
+        # AND the edge has the attribute 'is_valid' set to True.
+        for u, v, data in self.graph.edges(data=True):
+            if u in valid_nodes_in_graph and v in valid_nodes_in_graph: # Both ends of edge must be in KPI tables
+                if data.get('is_valid', False): # Default to False if 'is_valid' attr is missing
+                    valid_kpi_graph.add_edge(u, v, **data)
+
+        # Check if the number of nodes in the filtered graph is the same as the number of unique, valid input nodes.
+        # If not, it means some nodes became isolated after removing invalid edges or edges to non-KPI tables.
+        if len(valid_kpi_graph.nodes()) < len(valid_nodes_in_graph):
+             # This condition implies that some of the valid_nodes_in_graph are not present
+             # in the valid_kpi_graph. This can happen if a node from valid_nodes_in_graph
+             # had all its connections (to other nodes in valid_nodes_in_graph) as invalid,
+             # making it an isolate if we only consider valid edges.
+             # NetworkX's is_weakly_connected will correctly handle isolates.
+             # A graph with N nodes, where K of them are isolates, is not connected if K < N and N > 1.
+             pass # Let is_weakly_connected handle this.
+
+        # If, after filtering edges, the graph has 0 or 1 node, it's trivially connected.
+        # This check is important if valid_kpi_graph ended up with very few nodes due to filtering.
+        if len(valid_kpi_graph.nodes()) <= 1 :
+             return True
+
+        return networkx.is_weakly_connected(valid_kpi_graph)

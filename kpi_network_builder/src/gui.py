@@ -667,14 +667,18 @@ class MainWindow(QMainWindow):
                                         f"KPI '{new_kpi.kpi_name}' defined, but not all its required tables "
                                         "seem to be on the canvas. Connectivity check might be unreliable.")
 
-                is_connected = self.network_canvas_view.kpi_graph_ref.all_tables_connected(table_ids_for_check)
+                # Use the new graph method for checking connectivity via valid links
+                # self.kpi_graph is the same as self.network_canvas_view.kpi_graph_ref
+                is_connected_via_valid_links = self.kpi_graph.check_kpi_connectivity(table_ids_for_check)
+                new_kpi.isAvailable = is_connected_via_valid_links # Set the KPI's availability status
 
                 msg = (f"KPI '{new_kpi.kpi_name}' defined successfully.\n"
                        f"Number of tables involved: {len(table_ids_for_check)}.\n"
-                       f"Tables are connected in the graph: {'Yes' if is_connected else 'No'}.")
+                       f"Tables Connected via Valid Links: {'Yes' if is_connected_via_valid_links else 'No'}\n"
+                       f"KPI Available: {'Yes' if new_kpi.isAvailable else 'No'}")
 
                 QMessageBox.information(self, "KPI Defined", msg)
-                print(f"Defined KPI: {new_kpi.kpi_name}, Connected: {is_connected}, Data: {new_kpi.data_required}")
+                print(f"Defined KPI: {new_kpi.kpi_name}, Connected via Valid Links: {is_connected_via_valid_links}, Is Available: {new_kpi.isAvailable}, Data: {new_kpi.data_required}")
 
             else:
                 QMessageBox.warning(self, "KPI Not Defined",

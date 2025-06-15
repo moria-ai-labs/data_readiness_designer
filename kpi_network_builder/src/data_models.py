@@ -177,6 +177,7 @@ class KPI:
     cadence: str
     description: str
     data_required: List[KPIRequiredData]
+    isAvailable: bool = False # New field to indicate if the KPI data is available
 
 def save_kpis_to_json(kpis: List[KPI], filepath: str) -> None:
     """

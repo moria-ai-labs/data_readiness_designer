@@ -11,23 +11,23 @@ class TestKPINetworkGraph(unittest.TestCase):
 
         # Sample Table objects
         # Fields for T1
-        self.f1_t1 = Field(field_name="id", field_description="Primary Key", data_type="INT", constraints="PK")
-        self.f2_t1 = Field(field_name="value1", field_description="Value 1", data_type="VARCHAR", constraints="")
-        self.f_common_t1_t3 = Field(field_name="common_key_t1_t3", field_description="FK to T3", data_type="INT", constraints="")
+        self.f1_t1 = Field(field_name="id", field_description="Primary Key", data_type="INT", primary_key=True, nullable=False)
+        self.f2_t1 = Field(field_name="value1", field_description="Value 1", data_type="VARCHAR")
+        self.f_common_t1_t3 = Field(field_name="common_key_t1_t3", field_description="FK to T3", data_type="INT")
 
         # Fields for T2
-        self.f1_t2 = Field(field_name="id", field_description="Primary Key", data_type="INT", constraints="PK")
-        self.f2_t2 = Field(field_name="value2", field_description="Value 2", data_type="VARCHAR", constraints="")
-        self.f_common_t2_t3 = Field(field_name="common_key_t2_t3", field_description="FK to T3", data_type="INT", constraints="")
+        self.f1_t2 = Field(field_name="id", field_description="Primary Key", data_type="INT", primary_key=True, nullable=False)
+        self.f2_t2 = Field(field_name="value2", field_description="Value 2", data_type="VARCHAR")
+        self.f_common_t2_t3 = Field(field_name="common_key_t2_t3", field_description="FK to T3", data_type="INT")
 
         # Fields for T3 (potential bridge)
-        self.f1_t3 = Field(field_name="id", field_description="Primary Key", data_type="INT", constraints="PK")
-        self.f_common_t1_t3_ref = Field(field_name="common_key_t1_t3", field_description="Ref T1", data_type="INT", constraints="")
-        self.f_common_t2_t3_ref = Field(field_name="common_key_t2_t3", field_description="Ref T2", data_type="INT", constraints="")
+        self.f1_t3 = Field(field_name="id", field_description="Primary Key", data_type="INT", primary_key=True, nullable=False)
+        self.f_common_t1_t3_ref = Field(field_name="common_key_t1_t3", field_description="Ref T1", data_type="INT")
+        self.f_common_t2_t3_ref = Field(field_name="common_key_t2_t3", field_description="Ref T2", data_type="INT")
 
         # Fields for T4 (isolated or different common fields)
-        self.f1_t4 = Field(field_name="id", field_description="Primary Key", data_type="INT", constraints="PK")
-        self.f_other = Field(field_name="other_key", field_description="Other value", data_type="VARCHAR", constraints="")
+        self.f1_t4 = Field(field_name="id", field_description="Primary Key", data_type="INT", primary_key=True, nullable=False)
+        self.f_other = Field(field_name="other_key", field_description="Other value", data_type="VARCHAR")
 
 
         self.T1_obj = Table(domain_name="D1", table_name="T1", table_description="Table 1", fields=[self.f1_t1, self.f2_t1, self.f_common_t1_t3])
@@ -209,6 +209,67 @@ class TestKPINetworkGraph(unittest.TestCase):
         # the pair (T1,T2) should not be a key in the suggestions dict.
         pair_key = (self.t1_id, self.t2_id)
         self.assertNotIn(pair_key, suggestions, "Should not suggest links for already connected tables in selection.")
+
+    def test_check_kpi_connectivity(self):
+        # Scenario 1: Connected via valid links
+        self.graph.add_connection(self.t1_id, self.t2_id, is_valid=True)
+        self.graph.add_connection(self.t2_id, self.t3_id, is_valid=True)
+        self.assertTrue(self.graph.check_kpi_connectivity([self.t1_id, self.t2_id, self.t3_id]))
+
+        # Reset graph for next scenario (or use different graph instances)
+        self.graph = KPINetworkGraph()
+        self.graph.add_table_node(self.T1_obj.domain_name, self.T1_obj.table_name, self.T1_obj)
+        self.graph.add_table_node(self.T2_obj.domain_name, self.T2_obj.table_name, self.T2_obj)
+        self.graph.add_table_node(self.T3_obj.domain_name, self.T3_obj.table_name, self.T3_obj)
+        self.graph.add_table_node(self.T4_obj.domain_name, self.T4_obj.table_name, self.T4_obj)
+
+        # Scenario 2: Connected, but one link in path is invalid
+        self.graph.add_connection(self.t1_id, self.t2_id, is_valid=True)
+        self.graph.add_connection(self.t2_id, self.t3_id, is_valid=False) # Invalid link
+        self.assertFalse(self.graph.check_kpi_connectivity([self.t1_id, self.t2_id, self.t3_id]))
+        # T1 and T2 are connected by valid link
+        self.assertTrue(self.graph.check_kpi_connectivity([self.t1_id, self.t2_id]))
+
+
+        self.graph = KPINetworkGraph() # Reset
+        self.graph.add_table_node(self.T1_obj.domain_name, self.T1_obj.table_name, self.T1_obj)
+        self.graph.add_table_node(self.T2_obj.domain_name, self.T2_obj.table_name, self.T2_obj)
+        self.graph.add_table_node(self.T3_obj.domain_name, self.T3_obj.table_name, self.T3_obj)
+        self.graph.add_table_node(self.T4_obj.domain_name, self.T4_obj.table_name, self.T4_obj)
+
+        # Scenario 3: Tables form multiple valid components, but not one single component
+        self.graph.add_connection(self.t1_id, self.t2_id, is_valid=True) # Component 1
+        self.graph.add_connection(self.t3_id, self.t4_id, is_valid=True) # Component 2
+        self.assertFalse(self.graph.check_kpi_connectivity([self.t1_id, self.t2_id, self.t3_id, self.t4_id]))
+        self.assertTrue(self.graph.check_kpi_connectivity([self.t1_id, self.t2_id]))
+        self.assertTrue(self.graph.check_kpi_connectivity([self.t3_id, self.t4_id]))
+
+        self.graph = KPINetworkGraph() # Reset
+        self.graph.add_table_node(self.T1_obj.domain_name, self.T1_obj.table_name, self.T1_obj)
+        self.graph.add_table_node(self.T2_obj.domain_name, self.T2_obj.table_name, self.T2_obj)
+        self.graph.add_table_node(self.T3_obj.domain_name, self.T3_obj.table_name, self.T3_obj)
+
+        # Scenario 4: Some tables not connected by any valid path (T3 is isolated in terms of valid paths to T1/T2)
+        self.graph.add_connection(self.t1_id, self.t2_id, is_valid=True)
+        # T3 has no valid connections to T1 or T2
+        self.assertFalse(self.graph.check_kpi_connectivity([self.t1_id, self.t2_id, self.t3_id]))
+
+        # Scenario 5: Single table KPI
+        self.assertTrue(self.graph.check_kpi_connectivity([self.t1_id]))
+
+        # Scenario 6: Empty table list KPI
+        self.assertTrue(self.graph.check_kpi_connectivity([]))
+
+        # Scenario 7: Table ID not in graph
+        self.assertFalse(self.graph.check_kpi_connectivity([self.t1_id, self.invalid_id]))
+
+        # Scenario 8: Two tables, no valid path between them, but path exists via invalid link
+        self.graph = KPINetworkGraph() # Reset
+        self.graph.add_table_node(self.T1_obj.domain_name, self.T1_obj.table_name, self.T1_obj)
+        self.graph.add_table_node(self.T2_obj.domain_name, self.T2_obj.table_name, self.T2_obj)
+        self.graph.add_connection(self.t1_id, self.t2_id, is_valid=False)
+        self.assertFalse(self.graph.check_kpi_connectivity([self.t1_id, self.t2_id]))
+
 
 if __name__ == '__main__': # pragma: no cover
     unittest.main()
