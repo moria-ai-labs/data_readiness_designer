@@ -2,7 +2,7 @@
 Defines the core data models for representing data schemas and Key Performance Indicators (KPIs).
 
 This module includes dataclasses for:
-- `Field`: Represents a field within a data table.
+- `Field`: Represents a field within a data table, including constraint information.
 - `Table`: Represents a data table, including its fields and domain.
 - `Domain`: Represents a logical grouping of tables, often related to a business area.
 - `Schema`: Represents the overall data schema, composed of multiple domains.
@@ -15,7 +15,7 @@ It also provides utility functions for:
 """
 import json
 from dataclasses import dataclass, field, asdict
-from typing import List, Any
+from typing import List, Any, Optional # Optional is needed for type hints like Optional[str]
 
 @dataclass
 class Field:
@@ -26,12 +26,20 @@ class Field:
         field_name (str): The name of the field.
         field_description (str): A human-readable description of the field.
         data_type (str): The data type of the field (e.g., INT, VARCHAR, DECIMAL).
-        constraints (str): Any constraints applied to the field (e.g., "NOT NULL", "PRIMARY KEY").
+        primary_key (bool): True if the field is part of the primary key. Defaults to False.
+        nullable (bool): True if the field can contain NULL values. Defaults to True.
+        foreign_key (bool): True if the field is a foreign key. Defaults to False.
+        foreign_key_table (Optional[str]): The table referenced by the foreign key, if applicable.
+        foreign_key_column (Optional[str]): The column in the referenced table, if applicable.
     """
     field_name: str
     field_description: str
     data_type: str
-    constraints: str
+    primary_key: bool = False
+    nullable: bool = True  # Defaulting to True as 'nullable: false' is explicit in some schemas
+    foreign_key: bool = False
+    foreign_key_table: Optional[str] = None
+    foreign_key_column: Optional[str] = None
 
 @dataclass
 class Table:
@@ -82,6 +90,7 @@ def load_schema_from_json(filepath: str) -> Schema:
 
     The JSON file is expected to be a list of domain objects, where each domain
     contains a list of table objects, and each table contains a list of field objects.
+    The field definitions are parsed to populate the new attributes of the `Field` dataclass.
 
     Args:
         filepath (str): The path to the JSON file containing the schema definition.
@@ -97,23 +106,32 @@ def load_schema_from_json(filepath: str) -> Schema:
         TypeError: If data types in JSON are not as expected (e.g., a list where a dict is expected).
     """
     with open(filepath, 'r') as f:
-        data = json.load(f) # Can raise FileNotFoundError, json.JSONDecodeError
+        data = json.load(f)
 
     loaded_domains = []
-    for domain_data in data: # Iterates through the top-level list (domains)
+    for domain_data in data:
         loaded_tables = []
-        # Use .get for potentially missing keys to provide default empty lists
         for table_data in domain_data.get("tables", []):
             loaded_fields = []
             for field_data in table_data.get("fields", []):
-                # Field creation assumes all necessary keys are present in field_data
-                loaded_fields.append(Field(**field_data))
+                # Create Field object with new attributes
+                field_obj = Field(
+                    field_name=field_data.get("field_name", "UnknownField"),
+                    field_description=field_data.get("field_description", ""),
+                    data_type=field_data.get("data_type", "UNKNOWN"),
+                    primary_key=field_data.get("primary_key", False),
+                    nullable=field_data.get("nullable", True), # Default to True
+                    foreign_key=field_data.get("foreign_key", False),
+                    foreign_key_table=field_data.get("foreign_key_table"), # Will be None if key missing
+                    foreign_key_column=field_data.get("foreign_key_column") # Will be None if key missing
+                )
+                loaded_fields.append(field_obj)
 
             table_obj = Table(
                 table_name=table_data.get("table_name", "UnknownTable"),
                 table_description=table_data.get("table_description", ""),
                 fields=loaded_fields,
-                domain_name=domain_data.get("domain_name", "UnknownDomain") # Set table's domain context
+                domain_name=domain_data.get("domain_name", "UnknownDomain")
             )
             loaded_tables.append(table_obj)
 
@@ -181,6 +199,5 @@ def save_kpis_to_json(kpis: List[KPI], filepath: str) -> None:
         with open(filepath, 'w') as f:
             json.dump(kpi_list_of_dicts, f, indent=2)
     except (IOError, TypeError) as e:
-        # Log or print for server-side debugging, but re-raise for GUI to handle user notification
         print(f"Error during KPI saving in data_models.save_kpis_to_json: {e}")
         raise e
